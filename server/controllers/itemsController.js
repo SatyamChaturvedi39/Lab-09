@@ -22,14 +22,58 @@ export async function getImage(req, res) {
   res.send(rows[0].image);
 }
 
-// download image (as attachment)
+function extFromMime(mime) {
+  if (!mime) return '.bin';
+  const map = {
+    'image/jpeg': '.jpg',
+    'image/jpg':  '.jpg',
+    'image/png':  '.png',
+    'image/gif':  '.gif',
+    'image/webp': '.webp',
+    'image/svg+xml': '.svg'
+  };
+  return map[mime.toLowerCase()] || '';
+}
+
 export async function downloadImage(req, res) {
-  const id = Number(req.params.id);
-  const [rows] = await pool.query("SELECT image, image_type, title FROM shipments WHERE id = ?", [id]);
-  if (!rows.length || !rows[0].image) return res.status(404).end();
-  res.setHeader("Content-Type", rows[0].image_type || "application/octet-stream");
-  res.setHeader("Content-Disposition", `attachment; filename="${rows[0].title || 'image'}.bin"`);
-  res.send(rows[0].image);
+  const id = Number(req.params.id || 0);
+  if (!id) return res.status(400).send('Invalid id');
+
+  try {
+    const [rows] = await pool.query('SELECT title, image, image_type FROM shipments WHERE id = ?', [id]);
+    if (!rows || rows.length === 0) return res.status(404).send('Not found');
+
+    const row = rows[0];
+    const mime = row.image_type || 'application/octet-stream';
+    let buffer = row.image;
+
+    // If you stored base64 text by mistake, convert:
+    if (typeof buffer === 'string') {
+      // detect base64: very cautious check
+      if (/^[A-Za-z0-9+/=\r\n]+$/.test(buffer.trim())) {
+        buffer = Buffer.from(buffer, 'base64');
+      } else {
+        // fallback: send string as text
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        return res.send(buffer);
+      }
+    }
+
+    if (!Buffer.isBuffer(buffer)) {
+      return res.status(500).send('Image data not a buffer');
+    }
+
+    const filenameSafe = (row.title || `item-${id}`).replace(/[^a-z0-9_\-\.]/ig, '_');
+    const ext = extFromMime(mime) || '.bin';
+    const filename = `${filenameSafe}${ext}`;
+
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (err) {
+    console.error('downloadItemImage error:', err);
+    res.status(500).json({ error: 'Failed to fetch image' });
+  }
 }
 
 export async function createItem(req, res) {
