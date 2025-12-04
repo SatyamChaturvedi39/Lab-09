@@ -10,9 +10,8 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  connectTimeout: 15000,    // 15s connect timeout
-  acquireTimeout: 20000,
-  // If DB_CA is provided (PEM string in env), use it for SSL
+  connectTimeout: 20000, // 20s
+  // If DB_CA (PEM) is provided, use it for ssl
   ...(process.env.DB_CA ? { ssl: { ca: process.env.DB_CA } } : {})
 });
 
