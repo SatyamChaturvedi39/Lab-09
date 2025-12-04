@@ -3,6 +3,7 @@ import 'dotenv/config'; // ensures env loaded early
 import express from "express";
 import cors from "cors";
 import itemsRoutes from "./routes/itemsRoutes.js";
+import pool from './db.js';
 
 const app = express();
 app.use(cors({ origin: true })); // allow all origins for dev
